@@ -22,6 +22,12 @@ jobs:
       - name: build WITH_MUSIC=1
         run: pio run -e smalltv 2>&1 | tee music-on.log
 
+      - name: upload firmware (WITH_MUSIC=1)
+        uses: actions/upload-artifact@v4
+        with:
+          name: smalltv-music-firmware
+          path: .pio/build/smalltv/firmware.bin
+
       - name: build WITH_MUSIC=0 (baseline)
         run: |
           rm -rf .pio/build
