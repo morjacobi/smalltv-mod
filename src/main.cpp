@@ -36,6 +36,10 @@
 #include "HaMode.h"
 #include "MqttClient.h"
 #endif
+#if WITH_MUSIC
+#include "MusicMode.h"
+#include "MusicClient.h"
+#endif
 
 // ---- mode registry --------------------------------------------------------
 // The compiled-in features, in display order. main.cpp holds no per-feature
@@ -53,6 +57,9 @@ static DisplayMode* kModes[] = {
 #if WITH_HA
   &g_haMode,
 #endif
+#if WITH_MUSIC
+  &g_musicMode,
+#endif
 };
 static const size_t kModeCount = sizeof(kModes) / sizeof(kModes[0]);
 
@@ -69,6 +76,12 @@ static bool carouselHas(const Settings& s, const DisplayMode* m) {
     case MODE_RADAR:  return s.carouselRadar;
 #if WITH_HA
     case MODE_HA:     return s.carouselHa;
+#endif
+#if WITH_MUSIC
+    // Only rotate to the now-playing page while the daemon is pushing and the
+    // transport is actually playing; otherwise it's an empty card.
+    case MODE_MUSIC: return s.carouselMusic && musicGet().playing
+                          && musicFresh(MUSIC_STALE_GRACE_MS);
 #endif
     default:          return true;
   }

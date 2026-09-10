@@ -125,6 +125,7 @@
 #define MODE_CAROUSEL  3
 #define MODE_NOTIFY    4             // transient overlay: armed over HTTP, never persisted
 #define MODE_HA        5             // Home Assistant screens pushed over MQTT
+#define MODE_MUSIC     6             // now-playing pushed over HTTP by the media-control daemon
 #define DEFAULT_MODE MODE_STOCKS
 #define DEFAULT_CAROUSEL_SEC 30      // per-mode dwell in carousel
 
@@ -190,6 +191,16 @@
 #ifndef WITH_HA
 #define WITH_HA 1
 #endif
+#ifndef WITH_MUSIC
+#define WITH_MUSIC 1
+#endif
+
+// Now-playing (MODE_MUSIC, features/music): album-art edge in pixels. The device
+// keeps one MUSIC_ART_PX^2 RGB565 frame resident (96 -> 18,432 B of BSS on the
+// ESP8266), pushed pre-decoded by the daemon so the firmware never touches JPEG.
+#define MUSIC_ART_PX  96
+// Drop the music page from the carousel once pushes stop for this long.
+#define MUSIC_STALE_GRACE_MS  15000UL
 
 // Claude usage mode: once data stops arriving for this long (PC asleep, daemon
 // stopped, network down) the screen switches from the stats to the idle mascot

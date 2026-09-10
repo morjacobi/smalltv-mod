@@ -193,7 +193,7 @@ struct Settings {
 
   // --- Carousel (mode == MODE_CAROUSEL): dwell + which features rotate ---
   uint16_t carouselSec;
-  bool carouselTicker, carouselUsage, carouselRadar, carouselHa;
+  bool carouselTicker, carouselUsage, carouselRadar, carouselHa, carouselMusic;
 
   // --- Shared HTTP / display ---
   uint16_t httpTimeout; // ms

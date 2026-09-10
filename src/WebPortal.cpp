@@ -20,6 +20,9 @@
 #include "HaScreens.h"
 #include "MqttClient.h"
 #endif
+#if WITH_MUSIC
+#include "MusicClient.h"
+#endif
 
 // Defined in main.cpp — re-init every mode + force a repaint after a config change.
 extern void appInvalidate();
@@ -367,6 +370,35 @@ static void handleUsagePush() {
               ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
+// Now-playing push: the media-control daemon POSTs {"t","a","p"} here and streams
+// a raw 96x96 RGB565 (little-endian) album-art frame to /api/music/art as a
+// multipart file field. Open like /api/usage — it carries no credentials and
+// only drives one carousel page.
+#if WITH_MUSIC
+static void handleMusicPush() {
+  if (!server.hasArg("plain")) { server.send(400, "text/plain", "no body"); return; }
+  bool ok = musicApply(server.arg("plain"));
+  server.send(ok ? 200 : 400, "application/json",
+              ok ? "{\"ok\":true}" : "{\"ok\":false}");
+}
+
+static void handleMusicArtDone() {
+  bool ok = musicArtOk();
+  server.sendHeader("Connection", "close");
+  server.send(ok ? 200 : 400, "application/json",
+              ok ? "{\"ok\":true}" : "{\"ok\":false}");
+}
+
+static void handleMusicArtUpload() {
+  HTTPUpload& up = server.upload();
+  if (up.status == UPLOAD_FILE_START)        musicArtBegin();
+  else if (up.status == UPLOAD_FILE_WRITE)   musicArtWrite(up.buf, up.currentSize);
+  else if (up.status == UPLOAD_FILE_END)     musicArtEnd();
+  else if (up.status == UPLOAD_FILE_ABORTED) musicArtAbort();
+  yield();
+}
+#endif
+
 // Attention overlay: {"state":"done"|"waiting","ttl":<seconds>,"label":"<text>"}.
 // Never persisted. Behind the password like the rest of the API: unlike the
 // daemon's usage push, whatever fires these is a script of your own and can
@@ -458,6 +490,10 @@ void webPortalBegin(Settings& settings) {
   server.on("/api/checkupdate", HTTP_GET, handleCheckUpdate);
   server.on("/api/selfupdate", HTTP_POST, handleSelfUpdate);
   server.on("/api/usage", HTTP_POST, handleUsagePush);   // daemon pushes usage here
+#if WITH_MUSIC
+  server.on("/api/music", HTTP_POST, handleMusicPush);   // media-control daemon: now-playing meta
+  server.on("/api/music/art", HTTP_POST, handleMusicArtDone, handleMusicArtUpload);
+#endif
 #if WITH_HA
   server.on("/api/ha/clear", HTTP_POST, handleHaClear);  // purge HA screens (device + broker retained)
 #endif

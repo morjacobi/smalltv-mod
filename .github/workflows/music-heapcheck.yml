@@ -1,0 +1,39 @@
+name: music-heapcheck
+
+# Throwaway: measures the ESP8266 RAM/Flash cost of the music feature
+# (WITH_MUSIC=1 vs =0) on the standard smalltv env. Native ubuntu build — the
+# xtensa GCC segfaults under qemu-user on Apple Silicon.
+
+on:
+  push:
+    branches: [ music ]
+  workflow_dispatch:
+
+jobs:
+  heap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install platformio==6.1.19
+
+      - name: build WITH_MUSIC=1
+        run: pio run -e smalltv 2>&1 | tee music-on.log
+
+      - name: build WITH_MUSIC=0 (baseline)
+        run: |
+          rm -rf .pio/build
+          PLATFORMIO_BUILD_FLAGS="-D WITH_MUSIC=0" pio run -e smalltv 2>&1 | tee music-off.log
+
+      - name: delta
+        run: |
+          echo "### music-heapcheck" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "WITH_MUSIC=1" >> "$GITHUB_STEP_SUMMARY"
+          grep -E 'RAM:|Flash:' music-on.log  >> "$GITHUB_STEP_SUMMARY"
+          echo "WITH_MUSIC=0" >> "$GITHUB_STEP_SUMMARY"
+          grep -E 'RAM:|Flash:' music-off.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"
