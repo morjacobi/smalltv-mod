@@ -31,8 +31,9 @@ static void drawTextBand(const MusicData& m) {
   Arduino_GFX* gfx = gfxDev();
   gfx->fillRect(0, TEXT_TOP, TFT_WIDTH, TFT_HEIGHT - TEXT_TOP, C_BLACK);
 
-  uint8_t ts = gfxFitSize(m.title[0] ? m.title : "—", TFT_WIDTH - 16, 3);
-  gfxDrawCentered(m.title[0] ? m.title : "—", TEXT_TOP + 4, ts, C_WHITE);
+  const char* title = m.title[0] ? m.title : "(nothing playing)";
+  uint8_t ts = gfxFitSize(title, TFT_WIDTH - 16, 3);
+  gfxDrawCentered(title, TEXT_TOP + 4, ts, C_WHITE);
 
   if (m.artist[0]) {
     uint8_t as = gfxFitSize(m.artist, TFT_WIDTH - 16, 2);
