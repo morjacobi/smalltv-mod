@@ -196,9 +196,11 @@
 #endif
 
 // Now-playing (MODE_MUSIC, features/music): album-art edge in pixels. The device
-// keeps one MUSIC_ART_PX^2 RGB565 frame resident (96 -> 18,432 B of BSS on the
-// ESP8266), pushed pre-decoded by the daemon so the firmware never touches JPEG.
-#define MUSIC_ART_PX  96
+// keeps one MUSIC_ART_PX^2 RGB565 frame resident, pushed pre-decoded by the
+// daemon so the firmware never touches JPEG. 64 -> 8,192 B of BSS: measured
+// +8.2 KB static on the ESP8266 standard build (lean-tier). 96 was +18.8 KB and
+// did not leave the heap enough room to run. The daemon's SMALLTV_ART_PX must match.
+#define MUSIC_ART_PX  64
 // Drop the music page from the carousel once pushes stop for this long.
 #define MUSIC_STALE_GRACE_MS  15000UL
 

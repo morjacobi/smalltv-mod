@@ -9,8 +9,8 @@ MusicMode g_musicMode;
 #define C_PANEL gfxTint(0x18E3)   // art placeholder fill
 
 static const int ART = MUSIC_ART_PX;
-static const int ART_X = (TFT_WIDTH - ART) / 2;   // 72 for 96px
-static const int ART_Y = 30;
+static const int ART_X = (TFT_WIDTH - ART) / 2;
+static const int ART_Y = 44;
 static const int TEXT_TOP = ART_Y + ART + 12;     // start of the title/artist band
 
 // A tiny quaver in the header, drawn from primitives (the 6x8 font has no glyph).

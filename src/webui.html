@@ -119,6 +119,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
     <option value="usage">Clawdmeter</option>
     <option value="radar">Radar</option>
     <option value="ha">Home Assistant</option>
+    <option value="music">Music (now playing)</option>
     <option value="carousel">Carousel (rotate modes)</option>
    </select>
    <div id="carouselRow">
@@ -127,6 +128,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
     <div class="chk"><input id="carouselUsage" type="checkbox"><label>Clawdmeter</label></div>
     <div class="chk"><input id="carouselRadar" type="checkbox"><label>Radar</label></div>
     <div class="chk"><input id="carouselHa" type="checkbox"><label>Home Assistant</label></div>
+    <div class="chk"><input id="carouselMusic" type="checkbox"><label>Music</label></div>
    </div>
    <small class="hint">Each name here is the tab that configures it. Pick the active feature, then set it up in its own tab. Carousel rotates through the ticked features.</small>
   </div>
@@ -406,8 +408,8 @@ var TZMAP={
 function fillTz(){var s=$('tz');if(!s)return;var keys=Object.keys(TZMAP).filter(function(k){return k!==''});
  keys.sort();s.innerHTML='<option value="">UTC</option>'+keys.map(function(k){return '<option value="'+k+'">'+k+'</option>'}).join('');}
 
-var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha'};
-var CAROPT={ticker:'carouselTicker',usage:'carouselUsage',radar:'carouselRadar',ha:'carouselHa'};
+var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha',music:'music'};
+var CAROPT={ticker:'carouselTicker',usage:'carouselUsage',radar:'carouselRadar',ha:'carouselHa',music:'carouselMusic'};
 function hideFeat(name){
  var b=document.querySelector('nav button[data-t="'+name+'"]'); if(b)b.remove();
  var sec=$(name); if(sec)sec.remove();
@@ -430,7 +432,7 @@ function setGain(id,lab,v){var n=(v!=null?v:100);sv(id,n);var e=$(lab);if(e)e.te
 function resetColors(){setGain('rGain','rgVal',100);setGain('gGain','ggVal',100);setGain('bGain','bgVal',100);
  toast('Gains reset — press Save settings to apply')}
 function loadConfig(){return j('/api/config').then(function(c){C=c;
- var f=c.features||{}; ['ticker','usage','radar','ha'].forEach(function(k){if(f[k]===false)hideFeat(k)});
+ var f=c.features||{}; ['ticker','usage','radar','ha','music'].forEach(function(k){if(f[k]===false)hideFeat(k)});
  // WireGuard is only built for the chips with room for it; drop the card otherwise
  if(f.wireguard===false){var wc=$('wgCard'); if(wc)wc.remove()}
  var w=c.wg||{};
@@ -463,7 +465,7 @@ function loadConfig(){return j('/api/config').then(function(c){C=c;
  $('mode').value=c.mode||'stocks'; modeChanged();
  sv('carouselSec',c.carouselSec||30);
  sc('carouselTicker',c.carouselTicker!==false); sc('carouselUsage',c.carouselUsage!==false); sc('carouselRadar',c.carouselRadar!==false);
- sc('carouselHa',c.carouselHa!==false);
+ sc('carouselHa',c.carouselHa!==false); sc('carouselMusic',c.carouselMusic!==false);
  // HA / MQTT slice
  var h=c.ha||{};
  sv('haBrokerHost',h.brokerHost); sv('haBrokerPort',h.brokerPort||1883);
@@ -552,7 +554,7 @@ function collect(){
  var o={mode:gv('mode'),
   carouselSec:parseInt(gv('carouselSec'))||30,
   carouselTicker:gc('carouselTicker'), carouselUsage:gc('carouselUsage'), carouselRadar:gc('carouselRadar'),
-  carouselHa:gc('carouselHa'),
+  carouselHa:gc('carouselHa'), carouselMusic:gc('carouselMusic'),
   brightness:parseInt(gv('brightness'))||0,
   rotation:parseInt(gv('rotation')),
   autoBrightness:gc('autoBrightness'),
