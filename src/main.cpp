@@ -40,6 +40,9 @@
 #include "MusicMode.h"
 #include "MusicClient.h"
 #endif
+#if WITH_CLOCK
+#include "ClockMode.h"
+#endif
 
 // ---- mode registry --------------------------------------------------------
 // The compiled-in features, in display order. main.cpp holds no per-feature
@@ -59,6 +62,9 @@ static DisplayMode* kModes[] = {
 #endif
 #if WITH_MUSIC
   &g_musicMode,
+#endif
+#if WITH_CLOCK
+  &g_clockMode,
 #endif
 };
 static const size_t kModeCount = sizeof(kModes) / sizeof(kModes[0]);
@@ -82,6 +88,9 @@ static bool carouselHas(const Settings& s, const DisplayMode* m) {
     // transport is actually playing; otherwise it's an empty card.
     case MODE_MUSIC: return s.carouselMusic && musicGet().playing
                           && musicFresh(MUSIC_STALE_GRACE_MS);
+#endif
+#if WITH_CLOCK
+    case MODE_CLOCK:  return s.carouselClock;
 #endif
     default:          return true;
   }

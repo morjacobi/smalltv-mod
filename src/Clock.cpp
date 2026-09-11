@@ -47,7 +47,10 @@ void clockReapply(const Settings& s) {
   // timezone change, and otherwise leave it alone. Night mode is one caller; a
   // WireGuard tunnel is the other, because the peer rejects a handshake stamped
   // with a wrong clock (and that build is an ESP32, where the heap cost is moot).
-  if (!s.clock.nightEnabled && !wgNeedsClock(s)) return;
+  // Third caller (besides night mode / WireGuard): the clock screen needs wall
+  // time whether or not night mode is on.
+  bool clockScreenNeedsTime = (s.mode == MODE_CLOCK) || (s.mode == MODE_CAROUSEL && s.carouselClock);
+  if (!s.clock.nightEnabled && !wgNeedsClock(s) && !clockScreenNeedsTime) return;
   if (!s_ntpStarted || s.clock.tzPosix != s_armedTz) clockBegin(s);
 }
 

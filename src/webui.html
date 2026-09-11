@@ -60,6 +60,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
  <button data-t="usage">Clawdmeter</button>
  <button data-t="radar">Radar</button>
  <button data-t="ha">Home Assistant</button>
+ <button data-t="clock">Clock &amp; Weather</button>
  <button data-t="update">System</button>
 </nav>
 <main>
@@ -120,6 +121,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
     <option value="radar">Radar</option>
     <option value="ha">Home Assistant</option>
     <option value="music">Music (now playing)</option>
+    <option value="clock">Clock &amp; Weather</option>
     <option value="carousel">Carousel (rotate modes)</option>
    </select>
    <div id="carouselRow">
@@ -129,6 +131,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
     <div class="chk"><input id="carouselRadar" type="checkbox"><label>Radar</label></div>
     <div class="chk"><input id="carouselHa" type="checkbox"><label>Home Assistant</label></div>
     <div class="chk"><input id="carouselMusic" type="checkbox"><label>Music</label></div>
+    <div class="chk"><input id="carouselClock" type="checkbox"><label>Clock &amp; Weather</label></div>
    </div>
    <small class="hint">Each name here is the tab that configures it. Pick the active feature, then set it up in its own tab. Carousel rotates through the ticked features.</small>
   </div>
@@ -292,6 +295,24 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
   </div>
  </section>
 
+ <!-- CLOCK & WEATHER (feature) -->
+ <section id="clock" class="tab">
+  <div class="card"><h2>Location</h2>
+   <div class="row">
+    <div><label>Latitude</label><input id="wxLat" type="number" step="0.0001" placeholder="52.3676"></div>
+    <div><label>Longitude</label><input id="wxLon" type="number" step="0.0001" placeholder="4.9041"></div>
+   </div>
+   <small class="hint">Forecast from <a href="https://open-meteo.com" target="_blank">open-meteo</a> (no key, no account). Leave at 0/0 and the screen skips the weather line. Same decimal-degrees format as the Radar tab — copy your coordinates over if you use both.</small>
+  </div>
+  <div class="card"><h2>Units &amp; refresh</h2>
+   <div class="row">
+    <div><label>Units</label>
+     <select id="wxFahrenheit"><option value="false">Celsius</option><option value="true">Fahrenheit</option></select></div>
+    <div><label>Refresh (s)</label><input id="wxPollSec" type="number" min="60" max="21600"></div>
+   </div>
+  </div>
+ </section>
+
  <!-- HOME ASSISTANT (feature) -->
  <section id="ha" class="tab">
   <div class="card"><h2>MQTT</h2>
@@ -408,8 +429,8 @@ var TZMAP={
 function fillTz(){var s=$('tz');if(!s)return;var keys=Object.keys(TZMAP).filter(function(k){return k!==''});
  keys.sort();s.innerHTML='<option value="">UTC</option>'+keys.map(function(k){return '<option value="'+k+'">'+k+'</option>'}).join('');}
 
-var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha',music:'music'};
-var CAROPT={ticker:'carouselTicker',usage:'carouselUsage',radar:'carouselRadar',ha:'carouselHa',music:'carouselMusic'};
+var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha',music:'music',clock:'clock'};
+var CAROPT={ticker:'carouselTicker',usage:'carouselUsage',radar:'carouselRadar',ha:'carouselHa',music:'carouselMusic',clock:'carouselClock'};
 function hideFeat(name){
  var b=document.querySelector('nav button[data-t="'+name+'"]'); if(b)b.remove();
  var sec=$(name); if(sec)sec.remove();
@@ -432,7 +453,7 @@ function setGain(id,lab,v){var n=(v!=null?v:100);sv(id,n);var e=$(lab);if(e)e.te
 function resetColors(){setGain('rGain','rgVal',100);setGain('gGain','ggVal',100);setGain('bGain','bgVal',100);
  toast('Gains reset — press Save settings to apply')}
 function loadConfig(){return j('/api/config').then(function(c){C=c;
- var f=c.features||{}; ['ticker','usage','radar','ha','music'].forEach(function(k){if(f[k]===false)hideFeat(k)});
+ var f=c.features||{}; ['ticker','usage','radar','ha','music','clock'].forEach(function(k){if(f[k]===false)hideFeat(k)});
  // WireGuard is only built for the chips with room for it; drop the card otherwise
  if(f.wireguard===false){var wc=$('wgCard'); if(wc)wc.remove()}
  var w=c.wg||{};
@@ -466,6 +487,10 @@ function loadConfig(){return j('/api/config').then(function(c){C=c;
  sv('carouselSec',c.carouselSec||30);
  sc('carouselTicker',c.carouselTicker!==false); sc('carouselUsage',c.carouselUsage!==false); sc('carouselRadar',c.carouselRadar!==false);
  sc('carouselHa',c.carouselHa!==false); sc('carouselMusic',c.carouselMusic!==false);
+ sc('carouselClock',c.carouselClock!==false);
+ var wx=c.weather||{};
+ sv('wxLat',wx.lat); sv('wxLon',wx.lon); sv('wxFahrenheit',wx.fahrenheit?'true':'false');
+ sv('wxPollSec',wx.pollSec||1200);
  // HA / MQTT slice
  var h=c.ha||{};
  sv('haBrokerHost',h.brokerHost); sv('haBrokerPort',h.brokerPort||1883);
@@ -554,12 +579,14 @@ function collect(){
  var o={mode:gv('mode'),
   carouselSec:parseInt(gv('carouselSec'))||30,
   carouselTicker:gc('carouselTicker'), carouselUsage:gc('carouselUsage'), carouselRadar:gc('carouselRadar'),
-  carouselHa:gc('carouselHa'), carouselMusic:gc('carouselMusic'),
+  carouselHa:gc('carouselHa'), carouselMusic:gc('carouselMusic'), carouselClock:gc('carouselClock'),
   brightness:parseInt(gv('brightness'))||0,
   rotation:parseInt(gv('rotation')),
   autoBrightness:gc('autoBrightness'),
   backlightInverted:gc('backlightInverted'),
   hostname:gv('hostname'), apSsid:gv('apSsid'),
+  weather:{lat:parseFloat(gv('wxLat'))||0, lon:parseFloat(gv('wxLon'))||0,
+   fahrenheit:gv('wxFahrenheit')==='true', pollSec:parseInt(gv('wxPollSec'))||1200},
   display:{colorOrder:gv('colorOrder')||'auto', invert:gc('colorInvert'),
    rGain:parseInt(gv('rGain'))||100, gGain:parseInt(gv('gGain'))||100, bGain:parseInt(gv('bGain'))||100},
   wifi:collectWifi()};

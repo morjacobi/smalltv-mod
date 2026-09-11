@@ -126,6 +126,7 @@
 #define MODE_NOTIFY    4             // transient overlay: armed over HTTP, never persisted
 #define MODE_HA        5             // Home Assistant screens pushed over MQTT
 #define MODE_MUSIC     6             // now-playing pushed over HTTP by the media-control daemon
+#define MODE_CLOCK     7             // time/date + weather (open-meteo, plain HTTP)
 #define DEFAULT_MODE MODE_STOCKS
 #define DEFAULT_CAROUSEL_SEC 30      // per-mode dwell in carousel
 
@@ -193,6 +194,9 @@
 #endif
 #ifndef WITH_MUSIC
 #define WITH_MUSIC 1
+#endif
+#ifndef WITH_CLOCK
+#define WITH_CLOCK 1
 #endif
 
 // Now-playing (MODE_MUSIC, features/music): album-art edge in pixels. The device
@@ -305,6 +309,17 @@
 #define DEFAULT_RADAR_LON       0.0f
 #define DEFAULT_RADAR_RANGE_KM  20
 #define DEFAULT_RADAR_POLL_SEC  10     // >=3 keeps us under the 1 req/s limit
+
+// ---------------------------------------------------------------------------
+// Weather (MODE_CLOCK): open-meteo, no key, answers plain HTTP (no TLS heap
+// cost at all — the one feed on this device that's free). Ported from
+// iodn/geekmagic-tv-esp8266 (MIT).
+// ---------------------------------------------------------------------------
+#define WEATHER_HOST "api.open-meteo.com"
+#define WEATHER_PATH "/v1/forecast"
+#define DEFAULT_WEATHER_LAT       0.0f   // 0,0 = not set yet -> mode shows a prompt
+#define DEFAULT_WEATHER_LON       0.0f
+#define DEFAULT_WEATHER_POLL_SEC  1200   // 20 min; weather doesn't need to be fresher
 
 // ---------------------------------------------------------------------------
 // Defaults (used on first boot / factory reset)

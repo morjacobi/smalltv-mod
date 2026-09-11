@@ -177,6 +177,18 @@ struct RadarSettings {
   void fromJson(JsonObjectConst o);
 };
 
+// ---- Weather feature slice (MODE_CLOCK) ------------------------------------
+struct WeatherSettings {
+  float    lat;           // 0,0 = not set yet
+  float    lon;
+  bool     fahrenheit;    // false = Celsius
+  uint16_t pollSec;
+
+  void setDefaults();
+  void toJson(JsonObject o) const;
+  void fromJson(JsonObjectConst o);
+};
+
 // ---- Top-level settings ----------------------------------------------------
 struct Settings {
   // --- WiFi station networks (the device joins one of these) ---
@@ -193,7 +205,7 @@ struct Settings {
 
   // --- Carousel (mode == MODE_CAROUSEL): dwell + which features rotate ---
   uint16_t carouselSec;
-  bool carouselTicker, carouselUsage, carouselRadar, carouselHa, carouselMusic;
+  bool carouselTicker, carouselUsage, carouselRadar, carouselHa, carouselMusic, carouselClock;
 
   // --- Shared HTTP / display ---
   uint16_t httpTimeout; // ms
@@ -208,6 +220,7 @@ struct Settings {
   RadarSettings   radar;
   HaSettings      ha;        // MQTT broker for HA screens
   ClockSettings   clock;
+  WeatherSettings weather;   // MODE_CLOCK's forecast (open-meteo, plain HTTP)
   DisplaySettings display;   // panel colour correction
   WgSettings      wg;        // WireGuard tunnel (ESP32 targets)
   AuthSettings    auth;      // optional web UI password

@@ -332,6 +332,27 @@ void HaSettings::fromJson(JsonObjectConst o) {
 // ===========================================================================
 // Radar slice
 // ===========================================================================
+void WeatherSettings::setDefaults() {
+  lat = DEFAULT_WEATHER_LAT;
+  lon = DEFAULT_WEATHER_LON;
+  fahrenheit = false;
+  pollSec = DEFAULT_WEATHER_POLL_SEC;
+}
+
+void WeatherSettings::toJson(JsonObject o) const {
+  o["lat"]        = lat;
+  o["lon"]        = lon;
+  o["fahrenheit"] = fahrenheit;
+  o["pollSec"]    = pollSec;
+}
+
+void WeatherSettings::fromJson(JsonObjectConst o) {
+  if (o["lat"].is<float>() || o["lat"].is<int>()) lat = o["lat"].as<float>();
+  if (o["lon"].is<float>() || o["lon"].is<int>()) lon = o["lon"].as<float>();
+  if (o["fahrenheit"].is<bool>()) fahrenheit = o["fahrenheit"];
+  if (o["pollSec"].is<int>()) pollSec = constrain((int)o["pollSec"], 60, 21600);
+}
+
 void RadarSettings::setDefaults() {
   lat = DEFAULT_RADAR_LAT;
   lon = DEFAULT_RADAR_LON;
@@ -433,6 +454,7 @@ void Settings::setDefaults() {
   mode = DEFAULT_MODE;
   carouselSec = DEFAULT_CAROUSEL_SEC;
   carouselTicker = carouselUsage = carouselRadar = carouselHa = carouselMusic = true;
+  carouselClock = true;
   httpTimeout = DEFAULT_HTTP_TIMEOUT;
 
   brightness = DEFAULT_BRIGHTNESS;
@@ -445,6 +467,7 @@ void Settings::setDefaults() {
   radar.setDefaults();
   ha.setDefaults();
   clock.setDefaults();
+  weather.setDefaults();
   display.setDefaults();
   wg.setDefaults();
   auth.setDefaults();
@@ -517,6 +540,7 @@ void settingsToJson(const Settings& s, JsonObject root, bool includeSecrets) {
                             : (s.mode == MODE_USAGE)    ? "usage"
                             : (s.mode == MODE_HA)       ? "ha"
                             : (s.mode == MODE_MUSIC)    ? "music"
+                            : (s.mode == MODE_CLOCK)    ? "clock"
                             : (s.mode == MODE_CAROUSEL) ? "carousel" : "stocks";
   root["carouselSec"]       = s.carouselSec;
   root["carouselTicker"]    = s.carouselTicker;
@@ -524,6 +548,7 @@ void settingsToJson(const Settings& s, JsonObject root, bool includeSecrets) {
   root["carouselRadar"]     = s.carouselRadar;
   root["carouselHa"]        = s.carouselHa;
   root["carouselMusic"]     = s.carouselMusic;
+  root["carouselClock"]     = s.carouselClock;
   root["httpTimeout"]       = s.httpTimeout;
   root["brightness"]        = s.brightness;
   root["autoBrightness"]    = s.autoBrightness;
@@ -536,6 +561,7 @@ void settingsToJson(const Settings& s, JsonObject root, bool includeSecrets) {
   s.radar.toJson(root["radar"].to<JsonObject>());
   s.ha.toJson(root["ha"].to<JsonObject>(), includeSecrets);
   s.clock.toJson(root["clock"].to<JsonObject>());
+  s.weather.toJson(root["weather"].to<JsonObject>());
   s.display.toJson(root["display"].to<JsonObject>());
   s.wg.toJson(root["wg"].to<JsonObject>(), includeSecrets);
   s.auth.toJson(root["auth"].to<JsonObject>(), includeSecrets);
@@ -591,6 +617,7 @@ void settingsApplyJson(Settings& s, JsonObjectConst root) {
            : m.equalsIgnoreCase("usage")    ? MODE_USAGE
            : m.equalsIgnoreCase("ha")       ? MODE_HA
            : m.equalsIgnoreCase("music")    ? MODE_MUSIC
+           : m.equalsIgnoreCase("clock")    ? MODE_CLOCK
            : m.equalsIgnoreCase("carousel") ? MODE_CAROUSEL : MODE_STOCKS;
   }
   if (root["carouselSec"].is<int>())      s.carouselSec = constrain((int)root["carouselSec"], 5, 3600);
@@ -599,6 +626,7 @@ void settingsApplyJson(Settings& s, JsonObjectConst root) {
   if (root["carouselRadar"].is<bool>())   s.carouselRadar = root["carouselRadar"];
   if (root["carouselHa"].is<bool>())      s.carouselHa = root["carouselHa"];
   if (root["carouselMusic"].is<bool>())   s.carouselMusic = root["carouselMusic"];
+  if (root["carouselClock"].is<bool>())   s.carouselClock = root["carouselClock"];
 
   if (root["httpTimeout"].is<int>())        s.httpTimeout = constrain((int)root["httpTimeout"], 1000, 20000);
   if (root["brightness"].is<int>())         s.brightness = constrain((int)root["brightness"], 0, 100);
@@ -618,6 +646,7 @@ void settingsApplyJson(Settings& s, JsonObjectConst root) {
   // HA has no legacy flat layout either; only apply when its object is present.
   if (root["ha"].is<JsonObjectConst>()) s.ha.fromJson(root["ha"].as<JsonObjectConst>());
   if (root["clock"].is<JsonObjectConst>()) s.clock.fromJson(root["clock"].as<JsonObjectConst>());
+  if (root["weather"].is<JsonObjectConst>()) s.weather.fromJson(root["weather"].as<JsonObjectConst>());
   if (root["display"].is<JsonObjectConst>()) s.display.fromJson(root["display"].as<JsonObjectConst>());
   if (root["wg"].is<JsonObjectConst>()) s.wg.fromJson(root["wg"].as<JsonObjectConst>());
   if (root["auth"].is<JsonObjectConst>()) s.auth.fromJson(root["auth"].as<JsonObjectConst>());
