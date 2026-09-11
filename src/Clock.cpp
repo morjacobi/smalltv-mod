@@ -47,10 +47,17 @@ void clockReapply(const Settings& s) {
   // timezone change, and otherwise leave it alone. Night mode is one caller; a
   // WireGuard tunnel is the other, because the peer rejects a handshake stamped
   // with a wrong clock (and that build is an ESP32, where the heap cost is moot).
-  // Third caller (besides night mode / WireGuard): the clock screen needs wall
-  // time whether or not night mode is on.
-  bool clockScreenNeedsTime = (s.mode == MODE_CLOCK) || (s.mode == MODE_CAROUSEL && s.carouselClock);
-  if (!s.clock.nightEnabled && !wgNeedsClock(s) && !clockScreenNeedsTime) return;
+  // REVERTED (diagnostic): this used to also arm SNTP for the clock screen
+  // (mode==MODE_CLOCK or carouselClock). The device started reboot-looping
+  // ("Software/System restart") not long after that shipped, and survived
+  // longest with it in effect but still eventually crashed (~130s in, one
+  // run) even with the clock screen's own weather fetch AND its animation
+  // both disabled — SNTP running continuously is the one thing left in
+  // common. Reverting to the original gate (night mode / WireGuard only)
+  // until this is properly root-caused; the clock screen falls back to
+  // "syncing clock..." without night mode enabled. See
+  // wifi-weather-smalltv-mod memory for the investigation.
+  if (!s.clock.nightEnabled && !wgNeedsClock(s)) return;
   if (!s_ntpStarted || s.clock.tzPosix != s_armedTz) clockBegin(s);
 }
 
