@@ -21,16 +21,28 @@ static int  s_timeX = -1, s_timeY = -1;
 static bool s_colonOn = true;
 static int  s_lastSecond = -1;
 
+// The animated weather icon: same idea as the colon — redraw only its own
+// box every tick, not the screen. Center is fixed by the layout below.
+static const int  ICON_CX = TFT_WIDTH - 26, ICON_CY = 20;
+static const int  ICON_X0 = ICON_CX - 22, ICON_Y0 = 0, ICON_W = 44, ICON_H = 46;
+static const uint16_t ICON_FRAME_MS = 160;   // ~6 fps — plenty for a slow drift/rotate
+static uint8_t     s_iconAnimOn = 0;         // whether an icon is currently drawn at all
+static uint8_t     s_iconFrame = 0;
+static uint32_t    s_iconNextMs = 0;
+
 static const char* kWeekday[7] = {"Sunday", "Monday", "Tuesday", "Wednesday",
                                   "Thursday", "Friday", "Saturday"};
 static const char* kMonth[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-// ---- small vector icons (no bitmap font glyphs for any of this) -----------
-static void drawSun(Arduino_GFX* gfx, int cx, int cy, uint16_t c) {
+// ---- small vector icons, animated by `phase` (0..1, one loop) -------------
+// No bitmap assets: each frame is just the same primitives at moved
+// coordinates, redrawn into ICON_X0/Y0/W/H — cheap enough to do every tick.
+static void drawSun(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
   gfx->fillCircle(cx, cy, 7, c);
+  float spin = phase * 2 * PI;
   for (int a = 0; a < 8; a++) {
-    float rad = a * PI / 4;
+    float rad = a * PI / 4 + spin;
     int x0 = cx + (int)(cosf(rad) * 10), y0 = cy + (int)(sinf(rad) * 10);
     int x1 = cx + (int)(cosf(rad) * 14), y1 = cy + (int)(sinf(rad) * 14);
     gfx->drawLine(x0, y0, x1, y1, c);
@@ -44,37 +56,55 @@ static void drawCloud(Arduino_GFX* gfx, int cx, int cy, uint16_t c) {
   gfx->fillRoundRect(cx - 13, cy, 28, 9, 4, c);
 }
 
-static void drawRain(Arduino_GFX* gfx, int cx, int cy, uint16_t c) {
-  drawCloud(gfx, cx, cy - 4, c);
-  for (int i = -1; i <= 1; i++)
-    gfx->drawLine(cx + i * 8, cy + 10, cx + i * 8 - 3, cy + 17, c);
+// Gentle bob for the plain-cloud icon (no motion reads as "frozen", not calm).
+static void drawCloudDrift(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
+  drawCloud(gfx, cx + (int)(sinf(phase * 2 * PI) * 3), cy, c);
 }
 
-static void drawSnow(Arduino_GFX* gfx, int cx, int cy, uint16_t c) {
+static void drawRain(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
   drawCloud(gfx, cx, cy - 4, c);
-  for (int i = -1; i <= 1; i++) gfx->fillCircle(cx + i * 8, cy + 14, 2, c);
+  for (int i = -1; i <= 1; i++) {
+    float p = fmodf(phase * 2 + i * 0.33f, 1.0f);   // 0 (at cloud) .. 1 (below)
+    int y0 = cy + 9 + (int)(p * 9), y1 = y0 + 6;
+    gfx->drawLine(cx + i * 8, y0, cx + i * 8 - 2, y1, c);
+  }
 }
 
-static void drawStorm(Arduino_GFX* gfx, int cx, int cy, uint16_t c) {
+static void drawSnow(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
   drawCloud(gfx, cx, cy - 4, c);
+  for (int i = -1; i <= 1; i++) {
+    float p = fmodf(phase * 1.2f + i * 0.33f, 1.0f);
+    int x = cx + i * 8 + (int)(sinf(phase * 2 * PI + i) * 2);
+    int y = cy + 10 + (int)(p * 11);
+    gfx->fillCircle(x, y, 2, c);
+  }
+}
+
+static void drawStorm(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
+  drawCloud(gfx, cx, cy - 4, c);
+  bool flash = phase < 0.12f || (phase > 0.45f && phase < 0.55f);
+  if (!flash) return;
   int bx = cx - 2, by = cy + 8;
   gfx->fillTriangle(bx + 6, by, bx - 2, by + 9, bx + 3, by + 9, c);
   gfx->fillTriangle(bx + 3, by + 9, bx - 3, by + 18, bx + 5, by + 9, c);
 }
 
-static void drawFog(Arduino_GFX* gfx, int cx, int cy, uint16_t c) {
-  for (int i = 0; i < 4; i++)
-    gfx->fillRoundRect(cx - 14, cy - 6 + i * 6, 28, 3, 1, c);
+static void drawFog(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
+  for (int i = 0; i < 4; i++) {
+    int dx = (int)(sinf(phase * 2 * PI + i * 1.2f) * 4);
+    gfx->fillRoundRect(cx - 14 + dx, cy - 6 + i * 6, 28, 3, 1, c);
+  }
 }
 
-static void drawWeatherIcon(Arduino_GFX* gfx, int cx, int cy, WeatherIcon icon, uint16_t c) {
+static void drawWeatherIcon(Arduino_GFX* gfx, int cx, int cy, WeatherIcon icon, uint16_t c,
+                            float phase) {
   switch (icon) {
-    case WICON_SUN:   drawSun(gfx, cx, cy, c); break;
-    case WICON_RAIN:  drawRain(gfx, cx, cy, c); break;
-    case WICON_SNOW:  drawSnow(gfx, cx, cy, c); break;
-    case WICON_STORM: drawStorm(gfx, cx, cy, c); break;
-    case WICON_FOG:   drawFog(gfx, cx, cy, c); break;
-    default:          drawCloud(gfx, cx, cy, c); break;
+    case WICON_SUN:   drawSun(gfx, cx, cy, c, phase); break;
+    case WICON_RAIN:  drawRain(gfx, cx, cy, c, phase); break;
+    case WICON_SNOW:  drawSnow(gfx, cx, cy, c, phase); break;
+    case WICON_STORM: drawStorm(gfx, cx, cy, c, phase); break;
+    case WICON_FOG:   drawFog(gfx, cx, cy, c, phase); break;
+    default:          drawCloudDrift(gfx, cx, cy, c, phase); break;
   }
 }
 
@@ -108,7 +138,8 @@ static void drawSynced(struct tm& t, const Settings& s) {
     gfx->setCursor(10, 8);
     gfx->print(label);
   }
-  if (w.valid) drawWeatherIcon(gfx, TFT_WIDTH - 26, 20, weatherCodeToIcon(w.code), C_SKY);
+  s_iconAnimOn = w.valid;
+  if (w.valid) drawWeatherIcon(gfx, ICON_CX, ICON_CY, weatherCodeToIcon(w.code), C_SKY, 0.0f);
 
   // Big time. The colon is drawn as part of the string here (full repaint);
   // service() re-flashes just that glyph cell every second afterwards.
@@ -185,6 +216,19 @@ static void tickColon(bool on) {
   s_colonOn = on;
 }
 
+// One animation frame: erase the icon's box, redraw at the new phase. Only
+// that ~44x46 box, never the screen.
+static void tickIcon(const Settings& s) {
+  if (!s_iconAnimOn) return;
+  const WeatherData& w = weatherGet();
+  if (!w.valid) { s_iconAnimOn = false; return; }
+  Arduino_GFX* gfx = gfxDev();
+  gfx->fillRect(ICON_X0, ICON_Y0, ICON_W, ICON_H, C_BLACK);
+  s_iconFrame = (s_iconFrame + 1) % 60;   // 60 frames/loop @160ms = ~9.6s/cycle
+  drawWeatherIcon(gfx, ICON_CX, ICON_CY, weatherCodeToIcon(w.code), C_SKY,
+                 s_iconFrame / 60.0f);
+}
+
 void ClockMode::begin(const Settings& s) {
   weatherInit(s);
   needRender_ = true;
@@ -206,10 +250,15 @@ void ClockMode::service(const Settings& s) {
   bool syncChanged = synced != lastSynced_;
 
   if (!needRender_ && !minuteChanged && !weatherChanged && !syncChanged) {
-    // No full repaint due — just the once-a-second colon flash.
+    // No full repaint due — just the once-a-second colon flash and the
+    // weather icon's own animation, both partial redraws.
     if (synced && t.tm_sec != s_lastSecond) {
       s_lastSecond = t.tm_sec;
       tickColon(!s_colonOn);
+    }
+    if (synced && (int32_t)(millis() - s_iconNextMs) >= 0) {
+      s_iconNextMs = millis() + ICON_FRAME_MS;
+      tickIcon(s);
     }
     return;
   }
