@@ -25,7 +25,7 @@ static int  s_lastSecond = -1;
 // box every tick, not the screen. Center is fixed by the layout below.
 static const int  ICON_CX = TFT_WIDTH - 26, ICON_CY = 20;
 static const int  ICON_X0 = ICON_CX - 22, ICON_Y0 = 0, ICON_W = 44, ICON_H = 46;
-static const uint16_t ICON_FRAME_MS = 160;   // ~6 fps — plenty for a slow drift/rotate
+static const uint16_t ICON_FRAME_MS = 120;   // ~8 fps
 static uint8_t     s_iconAnimOn = 0;         // whether an icon is currently drawn at all
 static uint8_t     s_iconFrame = 0;
 static uint32_t    s_iconNextMs = 0;
@@ -56,9 +56,12 @@ static void drawCloud(Arduino_GFX* gfx, int cx, int cy, uint16_t c) {
   gfx->fillRoundRect(cx - 13, cy, 28, 9, 4, c);
 }
 
-// Gentle bob for the plain-cloud icon (no motion reads as "frozen", not calm).
+// Drift for the plain-cloud icon — needs a visible amplitude or "no motion"
+// reads as "frozen", not calm. Side-to-side plus a slight rise/fall so it
+// doesn't read as a simple side-to-side jitter.
 static void drawCloudDrift(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
-  drawCloud(gfx, cx + (int)(sinf(phase * 2 * PI) * 3), cy, c);
+  float a = phase * 2 * PI;
+  drawCloud(gfx, cx + (int)(sinf(a) * 7), cy + (int)(cosf(a) * 2), c);
 }
 
 static void drawRain(Arduino_GFX* gfx, int cx, int cy, uint16_t c, float phase) {
@@ -167,27 +170,26 @@ static void drawSynced(struct tm& t, const Settings& s) {
     return;
   }
 
-  // Temp row: thermometer + big value + condition, high/low on the right.
-  drawThermo(gfx, 18, 142, C_ACCENT);
+  // Temp row: thermometer + big value, own line.
+  drawThermo(gfx, 18, 140, C_ACCENT);
   char t1[8];
   snprintf(t1, sizeof(t1), "%d%s", w.temp, s.weather.fahrenheit ? "F" : "C");
   gfx->setTextSize(3);
   gfx->setTextColor(C_WHITE);
-  gfx->setCursor(46, 146);
+  gfx->setCursor(46, 144);
   gfx->print(t1);
-  gfx->setTextSize(2);
-  gfx->setTextColor(C_DIM);
-  int cw = gfxTextW(w.condition, 2);
-  gfx->setCursor(TFT_WIDTH - cw - 14, 152);
-  gfx->print(w.condition);
+
+  // Condition, its own centred line below — long labels ("Partly cloudy")
+  // collided with the temperature when they shared a row.
+  gfxDrawCentered(w.condition, 176, 2, C_DIM);
 
   // Humidity row: droplet + value, high/low alongside.
-  drawDroplet(gfx, 18, 178, C_SKY);
+  drawDroplet(gfx, 18, 200, C_SKY);
   char hline[10];
   snprintf(hline, sizeof(hline), "%d%%", w.humidity);
   gfx->setTextSize(2);
   gfx->setTextColor(C_WHITE);
-  gfx->setCursor(46, 182);
+  gfx->setCursor(46, 204);
   gfx->print(hline);
 
   char hl[20];
@@ -195,7 +197,7 @@ static void drawSynced(struct tm& t, const Settings& s) {
   int hlw = gfxTextW(hl, 2);
   gfx->setTextSize(2);
   gfx->setTextColor(C_DIM);
-  gfx->setCursor(TFT_WIDTH - hlw - 14, 182);
+  gfx->setCursor(TFT_WIDTH - hlw - 14, 204);
   gfx->print(hl);
 }
 
@@ -224,9 +226,9 @@ static void tickIcon(const Settings& s) {
   if (!w.valid) { s_iconAnimOn = false; return; }
   Arduino_GFX* gfx = gfxDev();
   gfx->fillRect(ICON_X0, ICON_Y0, ICON_W, ICON_H, C_BLACK);
-  s_iconFrame = (s_iconFrame + 1) % 60;   // 60 frames/loop @160ms = ~9.6s/cycle
+  s_iconFrame = (s_iconFrame + 1) % 24;   // 24 frames @120ms = ~2.9s/cycle: fast enough to read as motion
   drawWeatherIcon(gfx, ICON_CX, ICON_CY, weatherCodeToIcon(w.code), C_SKY,
-                 s_iconFrame / 60.0f);
+                 s_iconFrame / 24.0f);
 }
 
 void ClockMode::begin(const Settings& s) {
