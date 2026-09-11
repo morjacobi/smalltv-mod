@@ -14,21 +14,9 @@ ClockMode g_clockMode;
 #define C_UGREEN gfxTint(0x7C6B)   // green 0x788c5d — date line
 #define C_DIM    gfxTint(0xB574)   // secondary text
 
-// The blinking colon: geometry recorded by the last full draw so the
-// once-a-second toggle can redraw just that one glyph cell (no flicker, no
-// full-screen clear — the panel has no framebuffer to double-buffer with).
-static int  s_timeX = -1, s_timeY = -1;
-static bool s_colonOn = true;
-static int  s_lastSecond = -1;
-
-// The animated weather icon: same idea as the colon — redraw only its own
-// box every tick, not the screen. Center is fixed by the layout below.
-static const int  ICON_CX = TFT_WIDTH - 26, ICON_CY = 20;
-static const int  ICON_X0 = ICON_CX - 22, ICON_Y0 = 0, ICON_W = 44, ICON_H = 46;
-static const uint16_t ICON_FRAME_MS = 120;   // ~8 fps
-static uint8_t     s_iconAnimOn = 0;         // whether an icon is currently drawn at all
-static uint8_t     s_iconFrame = 0;
-static uint32_t    s_iconNextMs = 0;
+// Icon centre, fixed by the layout below. Static draw only for now — see the
+// note in service() on why the per-tick blink/animation is disabled.
+static const int ICON_CX = TFT_WIDTH - 26, ICON_CY = 20;
 
 static const char* kWeekday[7] = {"Sunday", "Monday", "Tuesday", "Wednesday",
                                   "Thursday", "Friday", "Saturday"};
@@ -141,22 +129,16 @@ static void drawSynced(struct tm& t, const Settings& s) {
     gfx->setCursor(10, 8);
     gfx->print(label);
   }
-  s_iconAnimOn = w.valid;
   if (w.valid) drawWeatherIcon(gfx, ICON_CX, ICON_CY, weatherCodeToIcon(w.code), C_SKY, 0.0f);
 
-  // Big time. The colon is drawn as part of the string here (full repaint);
-  // service() re-flashes just that glyph cell every second afterwards.
+  // Big time.
   char hm[8];
   snprintf(hm, sizeof(hm), "%02d:%02d", t.tm_hour, t.tm_min);
   gfx->setTextSize(6);
   gfx->setTextColor(C_WHITE);
   int hw = gfxTextW(hm, 6);
-  s_timeX = (TFT_WIDTH - hw) / 2;
-  s_timeY = 46;
-  gfx->setCursor(s_timeX, s_timeY);
+  gfx->setCursor((TFT_WIDTH - hw) / 2, 46);
   gfx->print(hm);
-  s_colonOn = true;
-  s_lastSecond = t.tm_sec;
 
   // Weekday, date.
   char date[28];
@@ -201,36 +183,6 @@ static void drawSynced(struct tm& t, const Settings& s) {
   gfx->print(hl);
 }
 
-// Flip the colon on/off by redrawing just its character cell — one glyph,
-// not the screen. GFX_FONT_W*size is one monospace cell; the colon is the
-// 3rd character of "HH:MM".
-static void tickColon(bool on) {
-  if (s_timeX < 0) return;
-  Arduino_GFX* gfx = gfxDev();
-  int cellW = GFX_FONT_W * 6, x = s_timeX + 2 * cellW;
-  gfx->fillRect(x, s_timeY, cellW, GFX_FONT_H * 6, C_BLACK);
-  if (on) {
-    gfx->setTextSize(6);
-    gfx->setTextColor(C_WHITE);
-    gfx->setCursor(x, s_timeY);
-    gfx->print(':');
-  }
-  s_colonOn = on;
-}
-
-// One animation frame: erase the icon's box, redraw at the new phase. Only
-// that ~44x46 box, never the screen.
-static void tickIcon(const Settings& s) {
-  if (!s_iconAnimOn) return;
-  const WeatherData& w = weatherGet();
-  if (!w.valid) { s_iconAnimOn = false; return; }
-  Arduino_GFX* gfx = gfxDev();
-  gfx->fillRect(ICON_X0, ICON_Y0, ICON_W, ICON_H, C_BLACK);
-  s_iconFrame = (s_iconFrame + 1) % 24;   // 24 frames @120ms = ~2.9s/cycle: fast enough to read as motion
-  drawWeatherIcon(gfx, ICON_CX, ICON_CY, weatherCodeToIcon(w.code), C_SKY,
-                 s_iconFrame / 24.0f);
-}
-
 void ClockMode::begin(const Settings& s) {
   weatherInit(s);
   needRender_ = true;
@@ -251,25 +203,17 @@ void ClockMode::service(const Settings& s) {
   bool weatherChanged = weatherGet().lastOkMs != lastWeatherOk_;
   bool syncChanged = synced != lastSynced_;
 
-  if (!needRender_ && !minuteChanged && !weatherChanged && !syncChanged) {
-    // No full repaint due — just the once-a-second colon flash and the
-    // weather icon's own animation, both partial redraws.
-    if (synced && t.tm_sec != s_lastSecond) {
-      s_lastSecond = t.tm_sec;
-      tickColon(!s_colonOn);
-    }
-    if (synced && (int32_t)(millis() - s_iconNextMs) >= 0) {
-      s_iconNextMs = millis() + ICON_FRAME_MS;
-      tickIcon(s);
-    }
-    return;
-  }
+  // Blinking colon / animated icon disabled for now: both are per-tick
+  // partial redraws (trig math + small SPI writes every 120ms-1s) and the
+  // device started reboot-looping ("Software/System restart", accelerating)
+  // not long after they shipped. Static per-minute repaint only until that's
+  // root-caused — see wifi-weather-smalltv-mod memory.
+  if (!needRender_ && !minuteChanged && !weatherChanged && !syncChanged) return;
 
   Arduino_GFX* gfx = gfxDev();
   if (!synced) {
     gfx->fillScreen(C_BLACK);
     gfxDrawCentered("syncing clock...", 116, 2, C_DIM);
-    s_timeX = -1;   // no colon to blink while unsynced
   } else {
     drawSynced(t, s);
     lastMinute_ = t.tm_min;
