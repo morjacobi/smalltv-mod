@@ -194,7 +194,14 @@ void ClockMode::begin(const Settings& s) {
 void ClockMode::invalidate(const Settings& s) { needRender_ = true; }
 
 void ClockMode::service(const Settings& s) {
-  weatherService(s);   // no TLS, cheap — fine to poll only while this screen is up
+  // TEMPORARILY DISABLED: the device started crash-looping (reset reason
+  // "Software/System restart", now within ~10s of every boot) right after
+  // this shipped. api.open-meteo.com is a hostname this device has never
+  // resolved before (unlike the ticker/radar's already-proven DNS paths) —
+  // prime suspect is a blocking DNS stall tripping the software watchdog.
+  // Re-enable once that's hardened (explicit short connect timeout / a
+  // pre-flight DNS check) and soak-tested. See wifi-weather-smalltv-mod memory.
+  // weatherService(s);
 
   struct tm t;
   bool synced = clockNow(t);
