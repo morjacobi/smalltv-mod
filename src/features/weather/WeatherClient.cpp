@@ -39,6 +39,20 @@ const char* weatherCodeToText(int code) {
   }
 }
 
+WeatherIcon weatherCodeToIcon(int code) {
+  switch (code) {
+    case 0: case 1:                                 return WICON_SUN;
+    case 45: case 48:                                return WICON_FOG;
+    case 51: case 53: case 55: case 56: case 57:
+    case 61: case 63: case 65: case 66: case 67:
+    case 80: case 81: case 82:                       return WICON_RAIN;
+    case 71: case 73: case 75: case 77:
+    case 85: case 86:                                return WICON_SNOW;
+    case 95: case 96: case 99:                       return WICON_STORM;
+    default:                                         return WICON_CLOUD;
+  }
+}
+
 // ---- parse -------------------------------------------------------------
 static bool applyForecast(WeatherData& d, JsonDocument& doc) {
   JsonObjectConst current = doc["current"].as<JsonObjectConst>();
@@ -54,7 +68,9 @@ static bool applyForecast(WeatherData& d, JsonDocument& doc) {
   d.low  = (!lows.isNull()  && lows.size())  ? (int)lroundf(lows[0].as<float>())  : d.temp;
   d.rainChance = (!rain.isNull() && rain.size())
                    ? constrain((int)lroundf(rain[0].as<float>()), 0, 100) : 0;
-  strlcpy(d.condition, weatherCodeToText(current["weather_code"] | 0), sizeof(d.condition));
+  d.humidity = current["relative_humidity_2m"] | 0;
+  d.code = current["weather_code"] | 0;
+  strlcpy(d.condition, weatherCodeToText(d.code), sizeof(d.condition));
 
   d.valid = true;
   d.error = false;
@@ -64,8 +80,9 @@ static bool applyForecast(WeatherData& d, JsonDocument& doc) {
 
 static void buildFilter(JsonDocument& f) {
   JsonObject current = f["current"].to<JsonObject>();
-  current["temperature_2m"] = true;
-  current["weather_code"]   = true;
+  current["temperature_2m"]      = true;
+  current["weather_code"]        = true;
+  current["relative_humidity_2m"] = true;
   JsonObject daily = f["daily"].to<JsonObject>();
   daily["temperature_2m_max"] = true;
   daily["temperature_2m_min"] = true;
@@ -79,7 +96,7 @@ static bool fetchForecast(const Settings& s) {
   String url = "http://" + String(WEATHER_HOST) + WEATHER_PATH +
                "?latitude=" + String(s.weather.lat, 4) +
                "&longitude=" + String(s.weather.lon, 4) +
-               "&current=temperature_2m,weather_code" +
+               "&current=temperature_2m,weather_code,relative_humidity_2m" +
                "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
                "&forecast_days=1&timezone=auto" +
                (s.weather.fahrenheit ? "&temperature_unit=fahrenheit" : "");

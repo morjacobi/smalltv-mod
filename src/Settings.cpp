@@ -335,6 +335,7 @@ void HaSettings::fromJson(JsonObjectConst o) {
 void WeatherSettings::setDefaults() {
   lat = DEFAULT_WEATHER_LAT;
   lon = DEFAULT_WEATHER_LON;
+  label = "";
   fahrenheit = false;
   pollSec = DEFAULT_WEATHER_POLL_SEC;
 }
@@ -342,6 +343,7 @@ void WeatherSettings::setDefaults() {
 void WeatherSettings::toJson(JsonObject o) const {
   o["lat"]        = lat;
   o["lon"]        = lon;
+  o["label"]      = label;
   o["fahrenheit"] = fahrenheit;
   o["pollSec"]    = pollSec;
 }
@@ -349,6 +351,7 @@ void WeatherSettings::toJson(JsonObject o) const {
 void WeatherSettings::fromJson(JsonObjectConst o) {
   if (o["lat"].is<float>() || o["lat"].is<int>()) lat = o["lat"].as<float>();
   if (o["lon"].is<float>() || o["lon"].is<int>()) lon = o["lon"].as<float>();
+  if (o["label"].is<const char*>()) label = o["label"].as<String>();
   if (o["fahrenheit"].is<bool>()) fahrenheit = o["fahrenheit"];
   if (o["pollSec"].is<int>()) pollSec = constrain((int)o["pollSec"], 60, 21600);
 }

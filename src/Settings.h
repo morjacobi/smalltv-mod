@@ -181,6 +181,7 @@ struct RadarSettings {
 struct WeatherSettings {
   float    lat;           // 0,0 = not set yet
   float    lon;
+  String   label;         // display name, e.g. "Rehovot" (optional)
   bool     fahrenheit;    // false = Celsius
   uint16_t pollSec;
 

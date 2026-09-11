@@ -7,6 +7,8 @@ struct WeatherData {
   int      high;         // today's forecast high
   int      low;          // today's forecast low
   int      rainChance;   // 0..100 %
+  int      humidity;     // 0..100 %
+  int      code;         // raw WMO weather_code (icon selection)
   char     condition[20]; // "Clear", "Rain", ... (weatherCodeToText)
 
   bool     valid;
@@ -14,7 +16,7 @@ struct WeatherData {
   uint32_t lastOkMs;
 
   void clear() {
-    temp = high = low = rainChance = 0;
+    temp = high = low = rainChance = humidity = code = 0;
     condition[0] = 0;
     valid = false;
     error = false;

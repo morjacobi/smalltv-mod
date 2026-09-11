@@ -14,3 +14,6 @@ const WeatherData& weatherGet();
 bool weatherFresh(uint32_t withinMs);
 
 const char* weatherCodeToText(int code);     // WMO weather_code -> short label
+
+enum WeatherIcon : uint8_t { WICON_SUN, WICON_CLOUD, WICON_RAIN, WICON_SNOW, WICON_STORM, WICON_FOG };
+WeatherIcon weatherCodeToIcon(int code);
